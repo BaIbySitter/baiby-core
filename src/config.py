@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
+from typing import ClassVar
 from src.constants import RedisChannels
 
 class Settings(BaseSettings):
@@ -7,17 +8,19 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "bAIby Core"
     VERSION: str = "1.0.0"
     
+    # Server settings
+    HOST: str = "0.0.0.0"
+    PORT: int = 8000
+    
     # Logging
     LOG_LEVEL: str = "INFO"
 
-    # analysis expiration time
-    ANALYSIS_EXPIRATION_TIME: int = 10
-    
     # Redis settings
     REDIS_URL: str = "redis://localhost:6379"
+    REDIS_CHANNELS: ClassVar[RedisChannels] = RedisChannels
 
-    # Redis channels
-    REDIS_CHANNELS = RedisChannels
+    # Analysis settings
+    ANALYSIS_EXPIRATION_TIME: int = 10  # seconds
     
     class Config:
         env_file = ".env"

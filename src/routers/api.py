@@ -14,7 +14,7 @@ async def process_transaction(request: TransactionRequest):
             "request_id": str(uuid.uuid4()),
             **request.model_dump()
         }
-        logger.info(f"Processing transaction request: {data}")
+        logger.info(f"⚡ Processing transaction request: {data}")
         
         results = await core.analyze_transaction(data)
         return TransactionResponse(

@@ -1,20 +1,12 @@
-import json
 import logging
 import asyncio
 import time
-import aioredis
 
-from typing import Dict, Set
 from src.config import get_settings
-from enum import Enum
+from src.constants import RequestStatus
+from src.state_manager import StateManager
 
 logger = logging.getLogger(__name__)
-
-class RequestStatus(str, Enum):
-    PENDING = "pending"
-    PROCESSING = "processing"
-    COMPLETED = "completed"
-    ERROR = "error"
 
 class CoreService:
     """
@@ -27,82 +19,73 @@ class CoreService:
     """
     def __init__(self):
         self.settings = get_settings()
-        self.redis = None
-        self.expected_sentinels = {"malicious-address-sentinel"}
+        self.state = StateManager()
+        self.expected_sentinels = set()
 
-    async def connect(self):
-        """Connect to Redis"""
-        if not self.redis:
-            self.redis = await aioredis.from_url(self.settings.REDIS_URL)
-            logger.info("Connected to Redis")
-
-    async def analyze_transaction(self, data: dict) -> dict:
-        """Process request and wait for results"""
+    async def _dispatch_sentinels_request(self, data: dict):
+        """Initialize request state and notify sentinels"""
+        # Load sentinels if not already loaded
+        if not self.expected_sentinels:
+            self.expected_sentinels = await self.state.get_active_sentinels()
+            
         request_id = data["request_id"]
-        await self._dispatch_sentinels_request(data)
         
-        # Wait for completion
-        timeout = self.settings.ANALYSIS_EXPIRATION_TIME
+        # Initialize base request state
+        await self.state.set_request_status(
+            request_id=request_id,
+            status=RequestStatus.PENDING,
+            data=data
+        )
+
+        # Notify sentinels via PubSub
+        await self.state.publish_message(
+            self.settings.REDIS_CHANNELS.SENTINELS_INPUT,
+            {"request_id": request_id, "data": data}
+        )
+        logger.info(f"Request {request_id} dispatched to sentinels")
+
+    async def _wait_for_sentinels_analysis(self, request_id: str, timeout: float) -> dict:
+        """Wait for analysis completion and return results"""
         start_time = time.time()
+        results = {}
         
         while True:
-            request_key = f"request:{request_id}"
-            request_data = await self.redis.hgetall(request_key)
+            # Check status of each sentinel
+            sentinel_statuses = await self.state.get_sentinel_statuses(request_id)
+            completed_sentinels = set()
             
-            if request_data["status"] == RequestStatus.COMPLETED:
-                return json.loads(request_data["results"])
+            for sentinel, status in sentinel_statuses.items():
+                if status["status"] == RequestStatus.COMPLETED:
+                    completed_sentinels.add(sentinel)
+                    results[sentinel] = status["result"]
+            
+            # Check if all sentinels have completed
+            if completed_sentinels == self.expected_sentinels:
+                await self.state.set_request_status(
+                    request_id=request_id,
+                    status=RequestStatus.COMPLETED
+                )
+                logger.info(f"✅ All sentinels completed analysis for request {request_id}")
+                return results
             
             if time.time() - start_time > timeout:
                 raise TimeoutError(f"Request {request_id} timed out")
             
             await asyncio.sleep(0.1)
-            
-    async def handle_sentinel_response(self, message: dict):
-        """Update request state with sentinel results"""
-        request_id = message["request_id"]
-        sentinel_name = message["sentinel"]
-        analysis = message["analysis"]
 
-        request_key = f"request:{request_id}"
-        
-        # Update request state atomically
-        async with self.redis.pipeline(transaction=True) as pipe:
-            # Get current state
-            request_data = await pipe.hgetall(request_key)
-            
-            pending_sentinels = json.loads(request_data["pending_sentinels"])
-            results = json.loads(request_data["results"])
-            
-            # Update state
-            pending_sentinels.remove(sentinel_name)
-            results[sentinel_name] = analysis
-            
-            # Store updated state
-            await pipe.hset(request_key, mapping={
-                "pending_sentinels": json.dumps(pending_sentinels),
-                "results": json.dumps(results),
-                "status": RequestStatus.COMPLETED if not pending_sentinels else RequestStatus.PROCESSING
-            })
-
-    async def _dispatch_sentinels_request(self, data: dict):
-        """Initialize request state and notify sentinels"""
+    async def analyze_transaction(self, data: dict) -> dict:
+        """Process request and wait for results"""
         request_id = data["request_id"]
-        
-        # Initialize base request state
-        request_key = f"request:{request_id}"
-        await self.redis.hset(request_key, mapping={
-            "status": RequestStatus.PENDING,
-            "data": json.dumps(data),
-            "expected_sentinels": json.dumps(list(self.expected_sentinels)),  # Solo para referencia
-            "created_at": str(time.time())
-        })
-        await self.redis.expire(request_key, self.settings.ANALYSIS_EXPIRATION_TIME)
-
-        # Notify sentinels via PubSub
-        await self.redis.publish(
-            self.settings.REDIS_CHANNELS.SENTINELS_INPUT,
-            json.dumps({"request_id": request_id, "data": data})
+        await self._dispatch_sentinels_request(data)
+        sentinel_results = await self._wait_for_sentinels_analysis(
+            request_id, 
+            self.settings.ANALYSIS_EXPIRATION_TIME
         )
-        logger.info(f"Request {request_id} dispatched to sentinels")
+        logger.info(f"Sentinel results: {sentinel_results}")
+
+        return {
+            "request_id": request_id,
+            "warnings": [],
+        }
 
 core = CoreService()

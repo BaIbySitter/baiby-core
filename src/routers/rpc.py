@@ -1,9 +1,9 @@
 from fastapi import APIRouter
-from src.dispatcher import dispatcher
+from src.core import core
 from src.schemas.rpc import RPCRequest, RPCResponse
 import logging
 import uuid
-from src.core import core
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rpc")

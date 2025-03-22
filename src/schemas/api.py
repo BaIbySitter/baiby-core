@@ -1,11 +1,15 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional
 
 class TransactionRequest(BaseModel):
-    transaction_hash: str
-    address: str
-    data: Optional[Dict[str, Any]] = None
-    
+    chainId: int
+    from_address: str  # using from_address since 'from' is a Python keyword
+    to: str
+    data: str
+    value: str
+    reason: Optional[str] = None
+
 class TransactionResponse(BaseModel):
     request_id: str
     status: str = "processing" 
+    results: Optional[dict] = None
