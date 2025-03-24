@@ -19,3 +19,6 @@ echo "Starting application..."
 
 # Iniciar la aplicación
 exec poetry run python src/main.py
+
+# Start Next.js frontend
+cd /app/frontend && su nextjs -c "node server.js" &

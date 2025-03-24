@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     # Server settings
     HOST: str = "0.0.0.0"
     PORT: int = 8000
+    FRONTEND_URL: str = "http://localhost:3000"
     
     # Logging
     LOG_LEVEL: str = "INFO"
@@ -20,7 +21,7 @@ class Settings(BaseSettings):
     REDIS_CHANNELS: ClassVar[RedisChannels] = RedisChannels
 
     # Analysis settings
-    ANALYSIS_EXPIRATION_TIME: int = 10  # seconds
+    ANALYSIS_EXPIRATION_TIME: int = 3600  # segundos
     
     class Config:
         env_file = ".env"

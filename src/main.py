@@ -6,6 +6,7 @@ import inspect
 from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from src.state_manager import StateManager
 from src.sentinels.base_sentinel import BaseSentinel
 from contextlib import asynccontextmanager
@@ -77,6 +78,15 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
     lifespan=lifespan
+)
+
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[settings.FRONTEND_URL],  # Usar variable de entorno
+    allow_credentials=True,
+    allow_methods=["*"],  # Permitir todos los métodos HTTP
+    allow_headers=["*"],  # Permitir todos los headers
 )
 
 # Include routers

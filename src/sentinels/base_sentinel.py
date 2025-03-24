@@ -1,8 +1,8 @@
 import json
 import logging
 from src.config import get_settings
-from src.core import RequestStatus
-from state_manager import StateManager
+from src.constants import RequestStatus
+from src.state_manager import StateManager
 from abc import ABC, abstractmethod
 
 logger = logging.getLogger(__name__)

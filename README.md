@@ -47,17 +47,16 @@ docker-compose up --build
 ### Analyze a transaction
 
 ```bash
-curl -X POST \
-  http://localhost:8000/api/transaction \
-  -H 'Content-Type: application/json' \
+curl -X POST http://localhost:8000/api/transaction \
+  -H "Content-Type: application/json" \
   -d '{
     "chainId": 1,
     "from_address": "0x742d35Cc6634C0532925a3b844Bc454e4438f44e",
-    "to": "0x388C818CA8B9251b393131C08a736A67ccB19297",
-    "data": "0x23b872dd000000000000000000000000742d35cc6634c0532925a3b844bc454e4438f44e000000000000000000000000388c818ca8b9251b393131c08a736a67ccb19297000000000000000000000000000000000000000000000000000000000000006f",
+    "to_address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "data": "0x095ea7b3000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000e0",
     "value": "0",
-    "reason": "Normal transaction"
-}'
+    "reason": "Approve WETH contract"
+  }'
 ```
 
 Successful response:

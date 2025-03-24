@@ -1,2 +1,5 @@
 .vscode
 .env
+/frontend/.next
+/frontend/node_modules
+.env.local

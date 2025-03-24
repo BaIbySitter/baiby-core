@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from src.config import get_settings
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, List
 from redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
@@ -100,4 +100,31 @@ class StateManager:
         if not self._redis:
             await self.init()
         members = await self._redis.smembers("active_sentinels")
-        return set(members) 
+        return set(members)
+
+    async def get_all_requests(self) -> List[str]:
+        """Get all request IDs"""
+        keys = await self._redis.keys("request:*")
+        return [key.split(":")[1] for key in keys]
+
+    async def get_request_details(self, request_id: str) -> Optional[dict]:
+        """Get full details for a request including sentinel statuses"""
+        request_key = f"request:{request_id}"
+        sentinel_key = f"sentinel_status:{request_id}"
+
+        # Get request data
+        request_data = await self._redis.hgetall(request_key)
+        if not request_data:
+            return None
+
+        # Get sentinel statuses
+        sentinel_statuses = await self.get_sentinel_statuses(request_id)
+
+        return {
+            "request_id": request_id,
+            "status": request_data.get("status"),
+            "data": json.loads(request_data.get("data", "{}")),
+            "created_at": float(request_data.get("created_at", 0)),
+            "updated_at": float(request_data.get("updated_at", 0)) if "updated_at" in request_data else None,
+            "sentinel_statuses": sentinel_statuses
+        } 

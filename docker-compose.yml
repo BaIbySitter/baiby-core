@@ -3,7 +3,7 @@ version: '3.8'
 
 services:
   redis:
-    image: redis:latest
+    image: redis:alpine
     ports:
       - "6379:6379"
     volumes:
@@ -14,9 +14,12 @@ services:
       interval: 5s
       timeout: 3s
       retries: 3
+    restart: unless-stopped
 
-  app:
-    build: .
+  backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8000:8000"
     env_file:
@@ -24,12 +27,32 @@ services:
     environment:
       - HOST=0.0.0.0
       - PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+      - FRONTEND_URL=http://localhost:3000
+      - ANALYSIS_EXPIRATION_TIME=3600
+      - LOG_LEVEL=INFO
     depends_on:
       redis:
         condition: service_healthy
-    volumes:
-      - ./src:/app/src
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
     restart: unless-stopped
 
 volumes:
   redis_data:
+    name: baiby_redis_data
