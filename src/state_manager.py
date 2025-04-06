@@ -107,10 +107,25 @@ class StateManager:
         keys = await self._redis.keys("request:*")
         return [key.split(":")[1] for key in keys]
 
+    async def set_agent_status(self, request_id: str, status: str, result: Any = None):
+        """Set status and result for the agent"""
+        key = f"agent_status:{request_id}"
+        value = {
+            "status": status,
+            "result": result
+        }
+        await self._redis.set(key, json.dumps(value))
+        await self._redis.expire(key, get_settings().ANALYSIS_EXPIRATION_TIME)
+
+    async def get_agent_status(self, request_id: str) -> Optional[Dict]:
+        """Get agent status and result for a request"""
+        key = f"agent_status:{request_id}"
+        value = await self._redis.get(key)
+        return json.loads(value) if value else None
+
     async def get_request_details(self, request_id: str) -> Optional[dict]:
-        """Get full details for a request including sentinel statuses"""
+        """Get full details for a request including sentinel and agent statuses"""
         request_key = f"request:{request_id}"
-        sentinel_key = f"sentinel_status:{request_id}"
 
         # Get request data
         request_data = await self._redis.hgetall(request_key)
@@ -119,6 +134,9 @@ class StateManager:
 
         # Get sentinel statuses
         sentinel_statuses = await self.get_sentinel_statuses(request_id)
+        
+        # Get agent status
+        agent_status = await self.get_agent_status(request_id)
 
         return {
             "request_id": request_id,
@@ -126,5 +144,6 @@ class StateManager:
             "data": json.loads(request_data.get("data", "{}")),
             "created_at": float(request_data.get("created_at", 0)),
             "updated_at": float(request_data.get("updated_at", 0)) if "updated_at" in request_data else None,
-            "sentinel_statuses": sentinel_statuses
+            "sentinel_statuses": sentinel_statuses,
+            "agent_status": agent_status
         } 

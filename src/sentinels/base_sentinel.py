@@ -13,11 +13,6 @@ class BaseSentinel(ABC):
         self.settings = get_settings()
         self.state = StateManager()
 
-    @abstractmethod
-    async def analyze(self, data: dict) -> dict:
-        """Each sentinel must implement its own analysis logic"""
-        pass
-
     async def _initialize_status(self, request_id: str):
         """Initialize sentinel status for this request"""
         await self.state.set_sentinel_status(
@@ -26,15 +21,14 @@ class BaseSentinel(ABC):
             status=RequestStatus.PENDING
         )
 
-    async def _process_request(self, message: dict):
+    async def _process_request(self, data: dict):
         """Process incoming request"""
-        request_id = message["request_id"]
-        data = message["data"]
-
+        request_id = data.get("request_id")
         await self._initialize_status(request_id)
 
         try:
-            result = await self.analyze(data)
+            request_data = data.get("data")
+            result = await self.analyze(request_data)
             status = RequestStatus.COMPLETED
             logger.info(f"✅ Sentinel {self.name} completed analysis for request {request_id}")
         except Exception as e:
@@ -56,9 +50,15 @@ class BaseSentinel(ABC):
 
         try:
             async for message in pubsub.listen():
+                logger.info(f"🤖 {self.name} received message: {message}")
                 if message['type'] == 'message':
                     data = json.loads(message['data'])
                     await self._process_request(data)
         except Exception as e:
-            logger.error(f"Error in sentinel {self.name}: {e}")
+            logger.error(f"Error in {self.name} listener: {e}")
             raise 
+    
+    @abstractmethod
+    async def analyze(self, data: dict) -> dict:
+        """Each sentinel must implement its own analysis logic"""
+        pass

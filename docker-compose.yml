@@ -8,13 +8,13 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 3
     restart: unless-stopped
+    command: redis-server --bind 0.0.0.0
 
   backend:
     build: 
@@ -56,3 +56,4 @@ services:
 volumes:
   redis_data:
     name: baiby_redis_data
+

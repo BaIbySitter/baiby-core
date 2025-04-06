@@ -12,6 +12,7 @@ from src.sentinels.base_sentinel import BaseSentinel
 from contextlib import asynccontextmanager
 from src.config import get_settings
 from src.routers import api, rpc
+from src.agent import BAIbyAgent
 
 # Load environment variables from .env file
 load_dotenv()
@@ -22,8 +23,9 @@ settings = get_settings()
 logging.basicConfig(level=settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
-# Store sentinel tasks to cancel them on shutdown
+# Store sentinel tasks and agent task to cancel them on shutdown
 sentinel_tasks = []
+agent_task = None
 
 def discover_sentinels():
     """Dynamically discover and instantiate all sentinel classes"""
@@ -51,6 +53,12 @@ async def lifespan(app: FastAPI):
     state = StateManager()
     await state.init()
     
+    # Initialize agent
+    agent = BAIbyAgent()
+    global agent_task
+    agent_task = asyncio.create_task(agent.listen())
+    logger.info(f"🤖 Agent activated: {agent.name}")
+    
     # Discover and store sentinels
     sentinels = discover_sentinels()
     sentinel_names = {sentinel.name for sentinel in sentinels}
@@ -67,6 +75,10 @@ async def lifespan(app: FastAPI):
     yield  # Application runs here
     
     # Shutdown
+    if agent_task:
+        agent_task.cancel()
+        await asyncio.gather(agent_task, return_exceptions=True)
+        
     for task in sentinel_tasks:
         task.cancel()
     await asyncio.gather(*sentinel_tasks, return_exceptions=True)

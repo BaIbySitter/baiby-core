@@ -16,7 +16,7 @@ class SentinelOne(BaseSentinel):
             
             return {
                 "status": "success",
-                "message": "Analysis completed successfully"
+                "message": "Analysis completed successfully 1"
             }
         except Exception as e:
             logger.error(f"Error analyzing in {self.name}: {e}")

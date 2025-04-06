@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from src.core import core
-from src.schemas.api import TransactionRequest, TransactionResponse, RequestDetails, StatusResponse, DashboardResponse
+from src.schemas.api import TransactionRequest, TransactionResponse, RequestDetails, DashboardResponse
 import logging
 import uuid
 from datetime import datetime
@@ -18,16 +18,13 @@ async def health_check():
 @router.post("/transaction", response_model=TransactionResponse)
 async def process_transaction(request: TransactionRequest):
     try:
-        data = {
-            "request_id": str(uuid.uuid4()),
-            **request.model_dump()
-        }
+        data = request.model_dump()
         logger.info(f"⚡ Processing transaction request: {data}")
         
-        results = await core.analyze_transaction(data)
+        result = await core.analyze_transaction(data)
         return TransactionResponse(
-            request_id=data["request_id"],
-            results=results
+            request_id=result["request_id"],
+            results=result
         )
         
     except TimeoutError as e:
