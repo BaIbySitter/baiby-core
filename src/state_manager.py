@@ -1,9 +1,12 @@
 import json
 import logging
 import time
+import uuid
+
 from src.config import get_settings
-from typing import Any, Dict, Optional, List
+from typing import Any, Dict, Optional, List, Set
 from redis.asyncio import Redis
+from src.constants import RequestStatus
 
 logger = logging.getLogger(__name__)
 
@@ -33,45 +36,152 @@ class StateManager:
             self._redis = None
             logger.info("State manager closed")
 
-    async def set_sentinel_status(self, request_id: str, sentinel_name: str, status: str, result: Any = None):
-        """Set status and result for a specific sentinel"""
-        key = f"sentinel_status:{request_id}"
-        value = {
-            "status": status,
-            "result": result
+    async def initialize_request(self, data: dict) -> None:
+        """Initialize a new request with the unified structure"""
+        if not self._redis:
+            await self.init()
+        
+        request_id = str(uuid.uuid4())
+        # Create base structure
+        request_data = {
+            "request_id": request_id,
+            "chainId": data.get("chainId", ""),
+            "from_address": data.get("from_address", ""),
+            "to_address": data.get("to_address", ""),
+            "data": data.get("data", ""),
+            "value": data.get("value", "0"),
+            "reason": data.get("reason", ""),
+            "validations": [],
+            "created_at": time.time(),
+            "status": RequestStatus.PENDING
         }
-        await self._redis.hset(key, sentinel_name, json.dumps(value))
-        await self._redis.expire(key, get_settings().ANALYSIS_EXPIRATION_TIME)
+        
+        # Store in Redis
+        await self._redis.set(f"request:{request_id}", json.dumps(request_data))
+        await self._redis.expire(f"request:{request_id}", get_settings().ANALYSIS_EXPIRATION_TIME)
+        
+        return request_id
+
+    async def get_request(self, request_id: str) -> Optional[dict]:
+        """Get the complete request record"""
+        if not self._redis:
+            await self.init()
+        
+        data = await self._redis.get(f"request:{request_id}")
+        if not data:
+            return None
+            
+        return json.loads(data)
+
+    async def set_sentinel_status(self, request_id: str, sentinel_name: str, status: str, result: Any = None) -> None:
+        """Update a sentinel's status in the unified request record"""
+        if not self._redis:
+            await self.init()
+        
+        # Get current request data
+        request_data = await self.get_request(request_id)
+        if not request_data:
+            logger.error(f"Request {request_id} not found when setting sentinel status")
+            return
+        
+        # Ensure result is a dictionary if provided
+        if result is not None:
+            if isinstance(result, list) and len(result) > 0:
+                result = result[0]  # Convert list to dict by taking first element
+            elif not isinstance(result, dict):
+                result = {"result": result}  # Wrap ONLY non-dict results
+        
+        # Find if this sentinel already has an entry
+        sentinel_found = False
+        for validation in request_data.get("validations", []):
+            if validation.get("name") == sentinel_name:
+                validation["status"] = status
+                if result:
+                    validation["result"] = result
+                sentinel_found = True
+                break
+        
+        # If not found, add a new entry
+        if not sentinel_found:
+            new_validation = {
+                "name": sentinel_name,
+                "status": status
+            }
+            if result:
+                new_validation["result"] = result
+            
+            if "validations" not in request_data:
+                request_data["validations"] = []
+                
+            request_data["validations"].append(new_validation)
+        
+        # Update the timestamp
+        request_data["updated_at"] = time.time()
+        
+        # Save back to Redis
+        await self._redis.set(f"request:{request_id}", json.dumps(request_data))
+        await self._redis.expire(f"request:{request_id}", get_settings().ANALYSIS_EXPIRATION_TIME)
 
     async def get_sentinel_statuses(self, request_id: str) -> Dict:
-        """Get all sentinel statuses for a request"""
-        key = f"sentinel_status:{request_id}"
-        statuses = await self._redis.hgetall(key)
-        return {k: json.loads(v) for k, v in statuses.items()}
+        """Get all sentinel statuses for a request from the unified structure"""
+        request_data = await self.get_request(request_id)
+        if not request_data:
+            return {}
+        
+        sentinel_statuses = {}
+        for validation in request_data.get("validations", []):
+            if validation.get("name") != "agent":  # Exclude agent from sentinel results
+                sentinel_statuses[validation.get("name")] = {
+                    "status": validation.get("status"),
+                    "result": validation.get("result", {})
+                }
+        
+        return sentinel_statuses
 
-    async def set_request_status(self, request_id: str, status: str, data: Any = None):
-        """Set status and data for a request"""
-        key = f"request:{request_id}"
+    async def set_request_status(self, request_id: str, status: str, data: Any = None) -> None:
+        """Update the overall request status and optionally add data"""
+        request_data = await self.get_request(request_id)
         
-        # Check if request exists
-        exists = await self._redis.exists(key)
+        if not request_data:
+            if data:
+                # Initialize new request
+                request_data = await self.initialize_request(request_id, data)
+            else:
+                logger.error(f"Request {request_id} not found and no data provided to create it")
+                return
         
-        if not exists:
-            # New request - set all initial fields
-            mapping = {
-                "status": status,
-                "data": json.dumps(data) if data else None,
-                "created_at": str(time.time())
-            }
-        else:
-            # Existing request - update status and set updated_at
-            mapping = {
-                "status": status,
-                "updated_at": str(time.time())
-            }
-            
-        await self._redis.hset(key, mapping=mapping)
-        await self._redis.expire(key, get_settings().ANALYSIS_EXPIRATION_TIME)
+        # Update status
+        request_data["status"] = status
+        request_data["updated_at"] = time.time()
+        
+        # If any additional data is provided, update it
+        if data and isinstance(data, dict):
+            for key, value in data.items():
+                if key not in ["validations", "request_id", "created_at", "updated_at"]:
+                    request_data[key] = value
+        
+        # Save back to Redis
+        await self._redis.set(f"request:{request_id}", json.dumps(request_data))
+        await self._redis.expire(f"request:{request_id}", get_settings().ANALYSIS_EXPIRATION_TIME)
+
+    async def set_agent_status(self, request_id: str, status: str, result: Any = None) -> None:
+        """Set agent status in the unified request record"""
+        await self.set_sentinel_status(request_id, "agent", status, result)
+
+    async def get_agent_status(self, request_id: str) -> Optional[Dict]:
+        """Get agent status from the unified request record"""
+        request_data = await self.get_request(request_id)
+        if not request_data:
+            return None
+        
+        for validation in request_data.get("validations", []):
+            if validation.get("name") == "agent":
+                return {
+                    "status": validation.get("status"),
+                    "result": validation.get("result", {})
+                }
+        
+        return None
 
     async def subscribe_to_channel(self, channel: str):
         """Create and return a pubsub subscription"""
@@ -104,46 +214,11 @@ class StateManager:
 
     async def get_all_requests(self) -> List[str]:
         """Get all request IDs"""
+        if not self._redis:
+            await self.init()
         keys = await self._redis.keys("request:*")
         return [key.split(":")[1] for key in keys]
 
-    async def set_agent_status(self, request_id: str, status: str, result: Any = None):
-        """Set status and result for the agent"""
-        key = f"agent_status:{request_id}"
-        value = {
-            "status": status,
-            "result": result
-        }
-        await self._redis.set(key, json.dumps(value))
-        await self._redis.expire(key, get_settings().ANALYSIS_EXPIRATION_TIME)
-
-    async def get_agent_status(self, request_id: str) -> Optional[Dict]:
-        """Get agent status and result for a request"""
-        key = f"agent_status:{request_id}"
-        value = await self._redis.get(key)
-        return json.loads(value) if value else None
-
     async def get_request_details(self, request_id: str) -> Optional[dict]:
-        """Get full details for a request including sentinel and agent statuses"""
-        request_key = f"request:{request_id}"
-
-        # Get request data
-        request_data = await self._redis.hgetall(request_key)
-        if not request_data:
-            return None
-
-        # Get sentinel statuses
-        sentinel_statuses = await self.get_sentinel_statuses(request_id)
-        
-        # Get agent status
-        agent_status = await self.get_agent_status(request_id)
-
-        return {
-            "request_id": request_id,
-            "status": request_data.get("status"),
-            "data": json.loads(request_data.get("data", "{}")),
-            "created_at": float(request_data.get("created_at", 0)),
-            "updated_at": float(request_data.get("updated_at", 0)) if "updated_at" in request_data else None,
-            "sentinel_statuses": sentinel_statuses,
-            "agent_status": agent_status
-        } 
+        """Get full request details - for backward compatibility"""
+        return await self.get_request(request_id) 

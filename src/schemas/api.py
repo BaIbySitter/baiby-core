@@ -13,7 +13,7 @@ class TransactionRequest(BaseModel):
 class TransactionResponse(BaseModel):
     request_id: str
     status: str = "processing" 
-    results: Optional[dict] = None
+    result: Optional[dict] = None
 
 class SentinelStatus(BaseModel):
     status: str

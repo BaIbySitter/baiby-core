@@ -13,26 +13,33 @@ class BaseSentinel(ABC):
         self.settings = get_settings()
         self.state = StateManager()
 
-    async def _initialize_status(self, request_id: str):
-        """Initialize sentinel status for this request"""
+    async def _process_request(self, request_id: str):
+        """Process incoming request"""
+        
         await self.state.set_sentinel_status(
             request_id=request_id,
             sentinel_name=self.name,
             status=RequestStatus.PENDING
         )
 
-    async def _process_request(self, data: dict):
-        """Process incoming request"""
-        request_id = data.get("request_id")
-        await self._initialize_status(request_id)
-
         try:
-            request_data = data.get("data")
-            result = await self.analyze(request_data)
+            data = await self.state.get_request(request_id)
+            result = await self.analyze(data)
             status = RequestStatus.COMPLETED
+
+            # Ensure result has standard format
+            if isinstance(result, dict) and not result.get("status"):
+                result = {
+                    "status": "success",
+                    "message": "Analysis completed successfully",
+                    **result
+                }
             logger.info(f"✅ Sentinel {self.name} completed analysis for request {request_id}")
         except Exception as e:
-            result = {"error": str(e)}
+            result = {
+                "status": "error",
+                "message": str(e)
+            }
             status = RequestStatus.ERROR
             logger.error(f"❌ Sentinel {self.name} failed analysis for request {request_id}: {e}")
 
@@ -53,7 +60,8 @@ class BaseSentinel(ABC):
                 logger.info(f"🤖 {self.name} received message: {message}")
                 if message['type'] == 'message':
                     data = json.loads(message['data'])
-                    await self._process_request(data)
+                    request_id = data.get("request_id")
+                    await self._process_request(request_id)
         except Exception as e:
             logger.error(f"Error in {self.name} listener: {e}")
             raise 

@@ -23,8 +23,9 @@ async def process_transaction(request: TransactionRequest):
         
         result = await core.analyze_transaction(data)
         return TransactionResponse(
-            request_id=result["request_id"],
-            results=result
+            request_id=result.get("request_id"),
+            status="completed",
+            result=result
         )
         
     except TimeoutError as e:

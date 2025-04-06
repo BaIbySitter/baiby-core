@@ -13,6 +13,8 @@ class SentinelTwo(BaseSentinel):
         try:
             # Simulate processing time
             await asyncio.sleep(7)
+
+            # TODO: implement actual analysis logic
             
             return {
                 "status": "success",
