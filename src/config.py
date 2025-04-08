@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # Redis settings
-    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_CHANNELS: ClassVar[RedisChannels] = RedisChannels
 
     # Analysis settings

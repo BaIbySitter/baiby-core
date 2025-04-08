@@ -31,7 +31,7 @@ cp .env.example .env.local
 
 Update `.env.local` with your settings:
 ```env
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000/api
 ```
 
 3. Run the development server:

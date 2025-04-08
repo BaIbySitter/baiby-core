@@ -22,6 +22,7 @@ export default function Dashboard() {
         setError(null);
       } catch (e) {
         setError(e instanceof Error ? e.message : "An error occurred");
+        console.error("Error fetching dashboard data:", e);
       }
     };
 

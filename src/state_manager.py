@@ -51,76 +51,90 @@ class StateManager:
             "data": data.get("data", ""),
             "value": data.get("value", "0"),
             "reason": data.get("reason", ""),
-            "validations": [],
-            "created_at": time.time(),
+            "validations": json.dumps([]),  # Serialize list
+            "created_at": str(time.time()),
             "status": RequestStatus.PENDING
         }
         
-        # Store in Redis
-        await self._redis.set(f"request:{request_id}", json.dumps(request_data))
+        # Store in Redis as hash
+        await self._redis.hset(f"request:{request_id}", mapping=request_data)
         await self._redis.expire(f"request:{request_id}", get_settings().ANALYSIS_EXPIRATION_TIME)
         
         return request_id
 
-    async def get_request(self, request_id: str) -> Optional[dict]:
-        """Get the complete request record"""
+    async def set_request(self, request_id: str, request_data: dict) -> None:
+        """Store a new request in Redis"""
         if not self._redis:
             await self.init()
         
-        data = await self._redis.get(f"request:{request_id}")
+        # Convert dict to flat key-value pairs for hash
+        for key, value in request_data.items():
+            # Serialize complex values (lists, dicts) to JSON strings
+            if isinstance(value, (dict, list)):
+                value = json.dumps(value)
+            await self._redis.hset(f"request:{request_id}", key, value)
+
+    async def get_request(self, request_id: str) -> Optional[dict]:
+        """Retrieve a request from Redis"""
+        if not self._redis:
+            await self.init()
+        
+        # Get all fields from hash
+        data = await self._redis.hgetall(f"request:{request_id}")
         if not data:
             return None
-            
-        return json.loads(data)
+        
+        # Convert back to dict and deserialize JSON values
+        result = {}
+        for key, value in data.items():
+            try:
+                # Attempt to deserialize JSON values
+                result[key] = json.loads(value)
+            except json.JSONDecodeError:
+                # If not JSON, keep original value
+                result[key] = value
+        
+        return result
 
     async def set_sentinel_status(self, request_id: str, sentinel_name: str, status: str, result: Any = None) -> None:
         """Update a sentinel's status in the unified request record"""
         if not self._redis:
             await self.init()
         
-        # Get current request data
-        request_data = await self.get_request(request_id)
-        if not request_data:
-            logger.error(f"Request {request_id} not found when setting sentinel status")
-            return
+        # Get current validations
+        validations_json = await self._redis.hget(f"request:{request_id}", "validations")
+        validations = json.loads(validations_json) if validations_json else []
         
         # Ensure result is a dictionary if provided
         if result is not None:
             if isinstance(result, list) and len(result) > 0:
-                result = result[0]  # Convert list to dict by taking first element
+                result = result[0]
             elif not isinstance(result, dict):
-                result = {"result": result}  # Wrap ONLY non-dict results
+                result = {"result": result}
         
-        # Find if this sentinel already has an entry
+        # Update or add sentinel status
         sentinel_found = False
-        for validation in request_data.get("validations", []):
+        for validation in validations:
             if validation.get("name") == sentinel_name:
                 validation["status"] = status
-                if result:
+                if result is not None:
                     validation["result"] = result
                 sentinel_found = True
                 break
         
-        # If not found, add a new entry
         if not sentinel_found:
-            new_validation = {
+            validations.append({
                 "name": sentinel_name,
-                "status": status
-            }
-            if result:
-                new_validation["result"] = result
-            
-            if "validations" not in request_data:
-                request_data["validations"] = []
-                
-            request_data["validations"].append(new_validation)
+                "status": status,
+                **({"result": result} if result is not None else {})
+            })
         
-        # Update the timestamp
-        request_data["updated_at"] = time.time()
-        
-        # Save back to Redis
-        await self._redis.set(f"request:{request_id}", json.dumps(request_data))
-        await self._redis.expire(f"request:{request_id}", get_settings().ANALYSIS_EXPIRATION_TIME)
+        # Update validations in Redis
+        await self._redis.hset(
+            f"request:{request_id}", 
+            "validations", 
+            json.dumps(validations)
+        )
 
     async def get_sentinel_statuses(self, request_id: str) -> Dict:
         """Get all sentinel statuses for a request from the unified structure"""
@@ -150,18 +164,25 @@ class StateManager:
                 logger.error(f"Request {request_id} not found and no data provided to create it")
                 return
         
-        # Update status
-        request_data["status"] = status
-        request_data["updated_at"] = time.time()
+        # Update status and timestamp
+        await self._redis.hset(f"request:{request_id}", mapping={
+            "status": status,
+            "updated_at": str(time.time())
+        })
         
         # If any additional data is provided, update it
         if data and isinstance(data, dict):
+            update_data = {}
             for key, value in data.items():
                 if key not in ["validations", "request_id", "created_at", "updated_at"]:
-                    request_data[key] = value
+                    if isinstance(value, (dict, list)):
+                        value = json.dumps(value)
+                    update_data[key] = value
+            
+            if update_data:
+                await self._redis.hset(f"request:{request_id}", mapping=update_data)
         
-        # Save back to Redis
-        await self._redis.set(f"request:{request_id}", json.dumps(request_data))
+        # Set expiration
         await self._redis.expire(f"request:{request_id}", get_settings().ANALYSIS_EXPIRATION_TIME)
 
     async def set_agent_status(self, request_id: str, status: str, result: Any = None) -> None:

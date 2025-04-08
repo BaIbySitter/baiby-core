@@ -13,13 +13,32 @@ export interface TransactionData {
   reason?: string;
 }
 
+export interface ValidationResult {
+  name: string;
+  status: string;
+  result?: {
+    status: string;
+    message: string;
+    approved?: boolean;
+    risk_level?: string;
+    warnings?: string[];
+    timestamp?: number;
+    [key: string]: any;
+  };
+}
+
 export interface RequestDetails {
   request_id: string;
+  chainId: number | string;
+  from_address: string;
+  to_address: string;
+  data: string;
+  value: string;
+  reason?: string;
+  validations: ValidationResult[];
+  created_at: string | number;
+  updated_at?: string | number;
   status: string;
-  data: TransactionData;
-  created_at: string;
-  updated_at?: string;
-  sentinel_statuses: Record<string, SentinelStatus>;
 }
 
 export interface StatusData {
