@@ -40,4 +40,5 @@ python-dotenv = "^1.0.0"
 redis = "^5.0.0"
 pydantic-settings = "^2.8.0"
 aioredis = "^2.0.0"
+supabase = "^2.15.0"
 
