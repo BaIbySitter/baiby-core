@@ -1,16 +1,15 @@
 from enum import Enum
 
-class RedisChannels(str, Enum):
-    SENTINELS_INPUT = "baiby:sentinels:input"
-    # SENTINELS_OUTPUT = "baiby:sentinels:output" 
-    AGENT_INPUT = "baiby:agent:input"
-    # AGENT_OUTPUT = "baiby:agent:output"
+class RedisChannels(Enum):
+    SENTINELS_INPUT = "sentinels:input"
+    AGENT_INPUT = "agent:input"
+    PERSISTENCE = "system:persistence"
 
-class RequestStatus(str, Enum):
+class TransactionStatus(str, Enum):
     PENDING = "pending"
     PROCESSING = "processing"
     COMPLETED = "completed"
-    ERROR = "error"
+    FAILED = "failed"
 
 class AgentDecision(str, Enum):
     APPROVED = "approved"

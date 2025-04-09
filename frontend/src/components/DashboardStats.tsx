@@ -1,41 +1,31 @@
 import React from "react";
 
 interface DashboardStatsProps {
-  totalRequests: number;
-  activeRequests: number;
-  completedRequests: number;
+  totalTransactions: number;
+  activeCount: number;
+  completedCount: number;
 }
 
-export function DashboardStats({
-  totalRequests,
-  activeRequests,
-  completedRequests,
+export default function DashboardStats({
+  totalTransactions,
+  activeCount,
+  completedCount,
 }: DashboardStatsProps) {
   return (
-    <div className="grid grid-cols-3 gap-6">
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-          Total Requests
-        </h3>
-        <p className="mt-2 text-3xl font-semibold text-gray-700 dark:text-gray-300">
-          {totalRequests}
-        </p>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="bg-card text-card-foreground rounded-lg p-6 shadow dark:with-scanline">
+        <h3 className="text-muted-foreground text-sm dark:terminal-text">Total Transactions</h3>
+        <p className="text-3xl font-bold text-card-foreground dark:terminal-text dark:terminal-cursor">{totalTransactions}</p>
       </div>
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-          Active
-        </h3>
-        <p className="mt-2 text-3xl font-semibold text-yellow-600 dark:text-yellow-500">
-          {activeRequests}
-        </p>
+      
+      <div className="bg-card text-card-foreground rounded-lg p-6 shadow dark:with-scanline">
+        <h3 className="text-muted-foreground text-sm dark:terminal-text">Active Transactions</h3>
+        <p className="text-3xl font-bold text-card-foreground dark:terminal-text">{activeCount}</p>
       </div>
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-          Completed
-        </h3>
-        <p className="mt-2 text-3xl font-semibold text-green-600 dark:text-green-500">
-          {completedRequests}
-        </p>
+      
+      <div className="bg-card text-card-foreground rounded-lg p-6 shadow dark:with-scanline">
+        <h3 className="text-muted-foreground text-sm dark:terminal-text">Completed Transactions</h3>
+        <p className="text-3xl font-bold text-card-foreground dark:terminal-text">{completedCount}</p>
       </div>
     </div>
   );

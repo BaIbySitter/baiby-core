@@ -1,10 +1,12 @@
-import "./globals.css";
-import type { Metadata } from "next";
-import { ThemeProvider } from "@/components/ThemeProvider";
+import './globals.css';
+import { Inter } from 'next/font/google';
+import { ThemeProvider } from '@/components/ThemeProvider';
 
-export const metadata: Metadata = {
-  title: "bAIbySitter Status",
-  description: "Transaction analysis dashboard",
+const inter = Inter({ subsets: ['latin'] });
+
+export const metadata = {
+  title: 'bAIby Core Dashboard',
+  description: 'Dashboard para monitoreo de transacciones y sentinels de bAIby Core',
 };
 
 export default function RootLayout({
@@ -13,14 +15,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors">
+    <html lang="es" suppressHydrationWarning>
+      <body className={`${inter.className}`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
+          {/* Eliminamos el header global, ya que la página tiene su propio encabezado con el toggle de tema */}
           {children}
         </ThemeProvider>
       </body>

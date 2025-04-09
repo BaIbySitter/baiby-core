@@ -4,7 +4,7 @@ import asyncio
 import json
 import time
 from src.state_manager import StateManager
-from src.constants import RequestStatus, RedisChannels
+from src.constants import TransactionStatus
 from src.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -15,34 +15,34 @@ class BAIbyAgent:
         self.settings = get_settings()
         self.name = "agent"  # Changed to match expected format in validations
 
-    async def _initialize_status(self, request_id: str):
-        """Initialize agent status for this request"""
+    async def _initialize_status(self, transaction_id: str):
+        """Initialize agent status for this transaction"""
         await self.state.set_agent_status(
-            request_id=request_id,
-            status=RequestStatus.PENDING
+            transaction_id=transaction_id,
+            status=TransactionStatus.PENDING
         )
 
-    async def _process_request(self, data: dict):
+    async def _process_transaction(self, data: dict):
         """Process received messages from channel"""
-        request_id = data.get("request_id")
+        transaction_id = data.get("transaction_id")
         
-        if not request_id:
-            logger.error(f"{self.name} received message without request_id")
+        if not transaction_id:
+            logger.error(f"{self.name} received message without transaction_id")
             return
             
-        await self._initialize_status(request_id)
+        await self._initialize_status(transaction_id)
         
         try:
-            logger.info(f"🤖 {self.name} processing request {request_id}")
+            logger.info(f"🤖 {self.name} processing transaction {transaction_id}")
             await self.analyze(data)
             
         except Exception as e:
             logger.error(f"Error processing message in {self.name}: {e}")
             # Update status to error
             await self.state.set_sentinel_status(
-                request_id=request_id,
+                transaction_id=transaction_id,
                 sentinel_name=self.name,
-                status=RequestStatus.ERROR,
+                status=TransactionStatus.ERROR,
                 result={"error": str(e)}
             )
 
@@ -56,7 +56,7 @@ class BAIbyAgent:
                 logger.info(f"🤖 {self.name} received message: {message}")
                 if message['type'] == 'message':
                     data = json.loads(message['data'])
-                    await self._process_request(data)
+                    await self._process_transaction(data)
         except Exception as e:
             logger.error(f"Error in {self.name} listener: {e}")
             raise
@@ -64,12 +64,12 @@ class BAIbyAgent:
     async def analyze(self, data: Dict[str, Any]):
         """Analyze sentinel results and make final decision"""
         
-        request_id = data["request_id"]
+        transaction_id = data["transaction_id"]
         
         # Get sentinel results from the provided data or fetch them
         sentinel_results = data.get("sentinel_results", {})
         if not sentinel_results:
-            sentinel_results = await self.state.get_sentinel_statuses(request_id)
+            sentinel_results = await self.state.get_sentinel_statuses(transaction_id)
 
         try:
             high_risk = False
@@ -92,15 +92,15 @@ class BAIbyAgent:
                 "timestamp": time.time()
             }
 
-            status = RequestStatus.COMPLETED
-            logger.info(f"✅ Agent completed analysis for request {request_id}")
+            status = TransactionStatus.COMPLETED
+            logger.info(f"✅ Agent completed analysis for transaction {transaction_id}")
         except Exception as e:
             result = {"error": str(e)}
-            status = RequestStatus.ERROR
-            logger.error(f"❌ Agent failed analysis for request {request_id}: {e}")
+            status = TransactionStatus.ERROR
+            logger.error(f"❌ Agent failed analysis for transaction {transaction_id}: {e}")
 
         await self.state.set_agent_status(
-            request_id=request_id,
+            transaction_id=transaction_id,
             status=status,
             result=result
         )

@@ -13,6 +13,7 @@ from contextlib import asynccontextmanager
 from src.config import get_settings
 from src.routers import api, rpc
 from src.agent import BAIbyAgent
+from src.persistence_service import run_persistence_service
 
 # Load environment variables from .env file
 load_dotenv()
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 # Store sentinel tasks and agent task to cancel them on shutdown
 sentinel_tasks = []
 agent_task = None
+persistence_task = None
 
 def discover_sentinels():
     """Dynamically discover and instantiate all sentinel classes"""
@@ -49,15 +51,20 @@ def discover_sentinels():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global agent_task, persistence_task
+    
     # Startup
     state = StateManager()
     await state.init()
     
     # Initialize agent
     agent = BAIbyAgent()
-    global agent_task
     agent_task = asyncio.create_task(agent.listen())
     logger.info(f"🤖 Agent activated: {agent.name}")
+    
+    # Initialize persistence service
+    persistence_task = asyncio.create_task(run_persistence_service())
+    logger.info("💾 Persistence service activated")
     
     # Discover and store sentinels
     sentinels = discover_sentinels()
@@ -77,14 +84,25 @@ async def lifespan(app: FastAPI):
     # Shutdown
     if agent_task:
         agent_task.cancel()
-        await asyncio.gather(agent_task, return_exceptions=True)
+        
+    if persistence_task:
+        persistence_task.cancel()
         
     for task in sentinel_tasks:
         task.cancel()
-    await asyncio.gather(*sentinel_tasks, return_exceptions=True)
+        
+    # Gather all tasks to ensure they're properly canceled
+    all_tasks = [task for task in sentinel_tasks]
+    if agent_task:
+        all_tasks.append(agent_task)
+    if persistence_task:
+        all_tasks.append(persistence_task)
+        
+    if all_tasks:
+        await asyncio.gather(*all_tasks, return_exceptions=True)
     
     await state.close()
-    logger.info("Application and sentinels shutdown")
+    logger.info("Application and all services shutdown")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,

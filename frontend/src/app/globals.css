@@ -2,7 +2,198 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Estilos globales adicionales aquí */
+/* Global additional styles here */
 body {
   @apply antialiased;
+}
+
+@layer base {
+  :root {
+    --background: 210 40% 98%; /* bg-gray-50 */
+    --foreground: 222 47% 11%; /* Dark text */
+    --card: 0 0% 100%; /* bg-white */
+    --card-foreground: 222 47% 11%; /* Dark text for cards */
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem
+  }
+  .dark {
+    --background: 0 0% 0%; /* Pure black */
+    --foreground: 120 100% 60%; /* Neon green */
+    --card: 0 0% 6%; /* Black with a touch of gray */
+    --card-foreground: 120 100% 75%; /* Lighter green */
+    --popover: 0 0% 4%;
+    --popover-foreground: 120 100% 75%;
+    --primary: 120 100% 50%; /* Bright green */
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 120 100% 65%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 120 70% 40%; /* Dark green */
+    --accent: 120 100% 30%; /* Dark green */
+    --accent-foreground: 120 100% 90%; /* Very light green */
+    --destructive: 0 100% 40%; /* Dark red */
+    --destructive-foreground: 0 0% 100%;
+    --border: 120 50% 20%; /* Dark green border */
+    --input: 0 0% 12%;
+    --ring: 120 100% 40%;
+    --chart-1: 120 100% 45%;
+    --chart-2: 160 100% 45%;
+    --chart-3: 180 80% 45%;
+    --chart-4: 140 90% 45%;
+    --chart-5: 100 95% 45%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+html, body {
+  transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+
+/* Additional effects for the hacker theme */
+.dark .bg-card {
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.2);
+}
+
+.dark h1, .dark h2 {
+  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+}
+
+/* Terminal effect for text */
+.dark .terminal-text {
+  font-family: 'Courier New', monospace;
+  letter-spacing: 0.05em;
+}
+
+/* Scanline effect for some sections */
+@keyframes scanline {
+  0% {
+    background-position: 0 -100vh;
+  }
+  100% {
+    background-position: 0 100vh;
+  }
+}
+
+.dark .with-scanline {
+  position: relative;
+  overflow: hidden;
+}
+
+.dark .with-scanline::before {
+  content: "";
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(0, 255, 0, 0.05) 50%,
+    transparent 100%
+  );
+  background-size: 100% 5px;
+  pointer-events: none;
+  animation: scanline 8s linear infinite;
+}
+
+/* Style for transaction cards in dark mode */
+.dark a[href^="/"] {
+  border-color: rgba(0, 255, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+.dark a[href^="/"]:hover {
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+  border-color: rgba(0, 255, 0, 0.5);
+}
+
+.dark a[href^="/"]::before {
+  /* content: "> "; */
+  color: rgba(0, 255, 0, 0.7);
+}
+
+.dark a[href^="/"] .completed {
+  background-color: rgba(0, 255, 0, 0.15);
+  color: rgb(0, 255, 0);
+  font-family: 'Courier New', monospace;
+}
+
+/* Blinking cursor effect for some elements */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.dark .terminal-cursor::after {
+  content: "▋";
+  margin-left: 2px;
+  animation: blink 1s step-start infinite;
+  color: rgb(0, 255, 0);
+}
+
+/* Add at the end of the file - Style for badges and counters in hacker theme */
+.dark span.rounded-full {
+  background-color: rgba(0, 255, 0, 0.1) !important;
+  color: rgb(0, 255, 0) !important;
+  border: 1px solid rgba(0, 255, 0, 0.3);
+  font-family: 'Courier New', monospace;
+  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+  box-shadow: 0 0 5px rgba(0, 255, 0, 0.2);
+}
+
+/* Pulse animation for "Live" badge */
+@keyframes pulse-green {
+  0% { opacity: 0.7; }
+  50% { opacity: 1; }
+  100% { opacity: 0.7; }
+}
+
+.dark span:contains("Live") {
+  animation: pulse-green 2s infinite;
+}
+
+/* Style for large numbers */
+.dark .text-3xl {
+  text-shadow: 0 0 10px rgba(0, 255, 0, 0.7);
+}
+
+/* "Typing" effects for some elements */
+@keyframes typing {
+  from { width: 0 }
+  to { width: 100% }
+}
+
+.dark .typing-effect {
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typing 1s steps(30, end);
 } 

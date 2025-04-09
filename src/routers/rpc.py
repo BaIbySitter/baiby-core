@@ -1,34 +1,28 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from src.core import core
 from src.schemas.rpc import RPCRequest, RPCResponse
 import logging
-import uuid
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rpc")
 
 @router.post("/transaction", response_model=RPCResponse)
-async def process_transaction(rpc_request: RPCRequest):
+async def process_transaction(request: RPCRequest):
     try:
-        data = {
-            "request_id": rpc_request.id or str(uuid.uuid4()),
-            "method": rpc_request.method,
-            **rpc_request.params
-        }
+        data = request.model_dump()
+        logger.info(f"⚡ Processing transaction: {data}")
         
-        await core.process_request(data)
+        result = await core.analyze_transaction(data)
+
         return RPCResponse(
-            id=data["request_id"],
-            result={"status": "processing"}
+            transaction_id=result.get("transaction_id"),
+            status="completed",
+            result=result
         )
         
+    except TimeoutError as e:
+        logger.error(f"Timeout: {e}")
+        raise HTTPException(status_code=408, detail=str(e))
     except Exception as e:
-        logger.error(f"Error in RPC endpoint: {e}")
-        return RPCResponse(
-            id=rpc_request.id,
-            error={
-                "code": -32603,
-                "message": str(e)
-            }
-        ) 
+        logger.error(f"Error in API endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

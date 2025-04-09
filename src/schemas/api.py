@@ -1,7 +1,5 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Dict, List, Optional, Any, Union
-from datetime import datetime
-from enum import Enum
 
 class TransactionRequest(BaseModel):
     chainId: int
@@ -12,7 +10,7 @@ class TransactionRequest(BaseModel):
     reason: Optional[str] = None
 
 class TransactionResponse(BaseModel):
-    request_id: str
+    transaction_id: str
     status: str
     result: Dict[str, Any]
 
@@ -26,8 +24,8 @@ class SentinelStatus(BaseModel):
     result: Optional[dict] = None
     updated_at: Optional[str] = None
 
-class RequestDetails(BaseModel):
-    request_id: str
+class TransactionDetail(BaseModel):
+    transaction_id: str
     chainId: int
     from_address: str
     to_address: str
@@ -39,7 +37,14 @@ class RequestDetails(BaseModel):
     updated_at: Optional[Union[str, float]] = None
     status: str
 
+class TransactionSummary(BaseModel):
+    """Modelo resumido de transacción para el dashboard"""
+    transaction_id: str
+    from_address: str
+    created_at: Union[str, float]
+    status: str
+
 class DashboardResponse(BaseModel):
-    total_requests: int
-    active_requests: List[RequestDetails]
-    completed_requests: List[RequestDetails]
+    total_transactions: int
+    active_transactions: List[TransactionSummary]
+    completed_transactions: List[TransactionSummary]

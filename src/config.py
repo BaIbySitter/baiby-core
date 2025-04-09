@@ -1,6 +1,6 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
-from typing import ClassVar
+from typing import ClassVar, Optional
 from src.constants import RedisChannels
 
 class Settings(BaseSettings):
@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     # Redis settings
     REDIS_URL: str = "redis://localhost:6379/0"
     REDIS_CHANNELS: ClassVar[RedisChannels] = RedisChannels
+
+    # Supabase settings
+    SUPABASE_URL: Optional[str] = None
+    SUPABASE_KEY: Optional[str] = None
 
     # Analysis settings
     ANALYSIS_EXPIRATION_TIME: int = 3600  # segundos
